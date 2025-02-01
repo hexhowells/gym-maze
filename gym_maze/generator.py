@@ -1,5 +1,5 @@
 import random
-from grid import Grid
+from .grid import Grid
 
 
 def generate_maze(width, height, wall_tile=1, path_tile=0):
