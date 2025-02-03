@@ -6,6 +6,7 @@ import numpy as np
 from gym import spaces
 from .generator import generate_maze
 
+
 SCREEN_WIDTH, SCREEN_HEIGHT = 256, 256
 CELL_SIZE = 20
 FOV = math.pi / 3
@@ -21,6 +22,7 @@ GREY = (150, 150, 150)
 BLACK = (0, 0, 0)
 FLOOR_COLOR = (50, 50, 50)
 CEILING_COLOR = (100, 100, 100)
+
 
 class MazeEnv(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
@@ -47,8 +49,10 @@ class MazeEnv(gym.Env):
         self.player_speed = 1
         self.visited_cells = set()
         self.total_cells_visited = 0
-        self.steps_since_last_visit = 0
+        self.steps_since_last_reward = 0
         self.early_stop_threshold = early_stop_threshold
+        self.last_move = None
+        self.total_steps = 0
         
         self.action_space = spaces.Discrete(4)
         self.observation_space = spaces.Box(low=0, high=255, shape=(SCREEN_WIDTH, SCREEN_HEIGHT, 3), dtype=np.uint8)
@@ -61,7 +65,27 @@ class MazeEnv(gym.Env):
         else:
             self.screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
 
+
+    def _get_info(self):
+        return {
+            'player_loc': (self.player_x, self.player_y),
+            'player_angle': self.player_angle,
+            'player_speed': self.player_speed,
+            'visited_cells': self.visited_cells,
+            'steps_since_last_reward': self.steps_since_last_reward
+        }
+
+
+    def _update_player_loc(self, new_x, new_y):
+        if self.grid.get((int(new_y / CELL_SIZE), int(new_x / CELL_SIZE))) == 0:
+            self.player_x = new_x
+            self.player_y = new_y
+        
+
     def step(self, action):
+        self.total_steps += 1
+
+        # take action
         if action == LEFT:
             self.player_angle -= 0.05
         elif action == RIGHT:
@@ -69,43 +93,44 @@ class MazeEnv(gym.Env):
         elif action == FORWARD:
             new_x = self.player_x + (math.cos(self.player_angle) * self.player_speed)
             new_y = self.player_y + (math.sin(self.player_angle) * self.player_speed)
-
-            if self.grid.get((int(new_y / CELL_SIZE), int(new_x / CELL_SIZE))) == 0:
-                self.player_x = new_x
-                self.player_y = new_y
+            self._update_player_loc(new_x, new_y)
         elif action == BACKWARD:
             new_x = self.player_x - (math.cos(self.player_angle) * self.player_speed)
             new_y = self.player_y - (math.sin(self.player_angle) * self.player_speed)
+            self._update_player_loc(new_x, new_y)
 
-            if self.grid.get((int(new_y / CELL_SIZE), int(new_x / CELL_SIZE))) == 0:
-                self.player_x = new_x
-                self.player_y = new_y
-        
+        # get current tile
         cell = (int(self.player_x / CELL_SIZE), int(self.player_y / CELL_SIZE))
-        previous_visited = len(self.visited_cells)
-        self.visited_cells.add(cell)
         
-        if len(self.visited_cells) > previous_visited:
-            self.steps_since_last_visit = 0
+        # compute reward
+        if cell not in self.visited_cells:
+            reward = 1
+            self.visited_cells.add(cell)
+            self.steps_since_last_reward = 0
         else:
-            self.steps_since_last_visit += 1
+            reward = 0
+            self.steps_since_last_reward += 1
         
-        reward = len(self.visited_cells) - self.total_cells_visited
-        self.total_cells_visited = len(self.visited_cells)
+        # get current frame
         obs = self.render(mode='rgb_array')
 
-        done = len(self.visited_cells) == self.total_path_tiles or self.steps_since_last_visit >= self.early_stop_threshold
+        # check for completion or early stopping
+        done = len(self.visited_cells) == self.total_path_tiles or self.steps_since_last_reward >= self.early_stop_threshold
         
-        return obs, reward, done, {}
+        return obs, reward, done, self._get_info()
+
 
     def reset(self):
         self.player_x, self.player_y = 60, 60
         self.player_angle = 0
         self.visited_cells = set()
-        self.steps_since_last_visit = 0
+        self.steps_since_last_reward = 0
         self.total_cells_visited = 0
+        self.total_steps = 0
+
         return self.render(mode='rgb_array')
     
+
     def render(self, mode='human'):
         self.screen.fill(BLACK)
         pygame.draw.rect(self.screen, FLOOR_COLOR, (0, SCREEN_HEIGHT // 2, SCREEN_WIDTH, SCREEN_HEIGHT // 2))
@@ -135,5 +160,6 @@ class MazeEnv(gym.Env):
         elif mode == 'rgb_array':
             return np.transpose(pygame.surfarray.array3d(self.screen), (2, 0, 1))
     
+
     def close(self):
         pygame.quit()
