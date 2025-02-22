@@ -66,6 +66,10 @@ class MazeEnv(gym.Env):
             self.screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
 
 
+    def __str__(self):
+        return str(self.grid)
+
+
     def _get_info(self):
         return {
             'player_loc': (self.player_x, self.player_y),

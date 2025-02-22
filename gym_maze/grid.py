@@ -23,7 +23,13 @@ class Grid:
 
 
 	def __str__(self):
-		return '\n'.join([''.join(map(str,line)) for line in self.grid])
+		symbol_map = {1: '#', 0: ' '}
+
+		rows = []
+		for line in self.grid:
+			rows.append(''.join(symbol_map[cell] for cell in line))
+
+		return '\n'.join(rows)
 
 
 	def get_neighbours(self, point, rand=False):
