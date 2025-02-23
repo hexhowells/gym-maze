@@ -137,26 +137,37 @@ class MazeEnv(gym.Env):
 
 
     def render(self, mode='human'):
+        # draw empty environment (walls, floor, etc)
         self.screen.fill(BLACK)
         pygame.draw.rect(self.screen, FLOOR_COLOR, (0, SCREEN_HEIGHT // 2, SCREEN_WIDTH, SCREEN_HEIGHT // 2))
         pygame.draw.rect(self.screen, CEILING_COLOR, (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT // 2))
         
         start_angle = self.player_angle - FOV / 2
+
+        # cast N rays out in a given range of angles
         for ray in range(NUM_RAYS):
+            # calculate current ray angle
             angle = start_angle + ray * (FOV / NUM_RAYS)
             sin_a, cos_a = math.sin(angle), math.cos(angle)
             
+            # iteratively sample rays at different depth-steps
             for depth in range(1, MAX_DEPTH):
+                # calulate coords of ray location
                 target_x = int((self.player_x + cos_a * depth) / CELL_SIZE)
                 target_y = int((self.player_y + sin_a * depth) / CELL_SIZE)
                 
+                # check if ray has entered a tile with a wall
                 if self.grid.get((target_y, target_x)) == 1:
                     color = self.wall_colors.get((target_x, target_y), GREY)
+
+                    # calculate height and width of wall given its distance
                     depth *= math.cos(self.player_angle - angle)
                     wall_height = min(SCREEN_HEIGHT, 5000 / (depth + 0.0001))
                     wall_x = ray * (SCREEN_WIDTH / NUM_RAYS)
                     wall_width = SCREEN_WIDTH / NUM_RAYS
                     wall_y = (SCREEN_HEIGHT - wall_height) / 2
+
+                    # draw the wall
                     pygame.draw.rect(self.screen, color, (wall_x, wall_y, wall_width + 1, wall_height))
                     break
         
