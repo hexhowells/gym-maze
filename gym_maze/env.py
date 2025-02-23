@@ -1,9 +1,9 @@
-import gym
+import gymnasium as gym
 import pygame
 import random
 import math
 import numpy as np
-from gym import spaces
+from gymnasium import spaces
 from .generator import generate_maze
 
 
@@ -25,7 +25,7 @@ CEILING_COLOR = (100, 100, 100)
 
 
 class MazeEnv(gym.Env):
-    metadata = {'render.modes': ['human', 'rgb_array']}
+    #metadata = {'render_modes': ['human', 'rgb_array']}
     
     def __init__(self, maze_width=101, maze_height=101, headless=False, early_stop_threshold=1000):
         super(MazeEnv, self).__init__()
@@ -119,12 +119,14 @@ class MazeEnv(gym.Env):
         obs = self.render(mode='rgb_array')
 
         # check for completion or early stopping
-        done = len(self.visited_cells) == self.total_path_tiles or self.steps_since_last_reward >= self.early_stop_threshold
+        terminated = len(self.visited_cells) == self.total_path_tiles
+        truncated = self.steps_since_last_reward >= self.early_stop_threshold
         
-        return obs, reward, done, self._get_info()
+        return obs, reward, terminated, truncated, self._get_info()
 
 
-    def reset(self):
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
         self.player_x, self.player_y = 60, 60
         self.player_angle = 0
         self.visited_cells = set()
@@ -132,8 +134,9 @@ class MazeEnv(gym.Env):
         self.total_cells_visited = 0
         self.total_steps = 0
 
-        return self.render(mode='rgb_array')
-    
+        obs = self.render(mode='rgb_array')
+        return obs, {}
+
 
     def render(self, mode='human'):
         self.screen.fill(BLACK)
