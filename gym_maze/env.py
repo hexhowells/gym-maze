@@ -25,8 +25,6 @@ CEILING_COLOR = (100, 100, 100)
 
 
 class MazeEnv(gym.Env):
-    #metadata = {'render_modes': ['human', 'rgb_array']}
-    
     def __init__(self, maze_width=101, maze_height=101, headless=False, early_stop_threshold=1000):
         super(MazeEnv, self).__init__()
         
