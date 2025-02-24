@@ -144,32 +144,88 @@ class MazeEnv(gym.Env):
         
         start_angle = self.player_angle - FOV / 2
 
-        # cast N rays out in a given range of angles
+        # use DDA for each ray
         for ray in range(NUM_RAYS):
             # calculate current ray angle
             angle = start_angle + ray * (FOV / NUM_RAYS)
             sin_a, cos_a = math.sin(angle), math.cos(angle)
+
+            # get the current tile coord that the player is in
+            map_x = int(self.player_x / CELL_SIZE)
+            map_y = int(self.player_y / CELL_SIZE)
+
+            # distance the ray has to travel along X and Y to cross a tile
+            delta_dist_x = abs(1 / cos_a) if cos_a != 0 else 1e30
+            delta_dist_y = abs(1 / sin_a) if sin_a != 0 else 1e30
+
             
-            # iteratively sample rays at different depth-steps
-            for depth in range(1, MAX_DEPTH):
-                # calulate coords of ray location
-                target_x = int((self.player_x + cos_a * depth) / CELL_SIZE)
-                target_y = int((self.player_y + sin_a * depth) / CELL_SIZE)
-                
-                # check if ray has entered a tile with a wall
-                if self.grid.get((target_y, target_x)) == 1:
-                    color = self.wall_colors.get((target_x, target_y), GREY)
+            # calculate the direction the ray moves (step)
+            # calcuate the distance to the next side of the grid
+            #
+            # -cos | +cos
+            # +sin | +sin
+            # -----+------
+            # -cos | -cos
+            # -sin | +sin
 
-                    # calculate height and width of wall given its distance
-                    depth *= math.cos(self.player_angle - angle)
-                    wall_height = min(SCREEN_HEIGHT, 5000 / (depth + 0.0001))
-                    wall_x = ray * (SCREEN_WIDTH / NUM_RAYS)
-                    wall_width = SCREEN_WIDTH / NUM_RAYS
-                    wall_y = (SCREEN_HEIGHT - wall_height) / 2
+            if cos_a < 0:
+                step_x = -1
+                side_dist_x = (self.player_x / CELL_SIZE - map_x) * delta_dist_x
+            else:
+                step_x = 1
+                side_dist_x = (map_x + 1.0 - self.player_x / CELL_SIZE) * delta_dist_x
 
-                    # draw the wall
-                    pygame.draw.rect(self.screen, color, (wall_x, wall_y, wall_width + 1, wall_height))
-                    break
+            if sin_a < 0:
+                step_y = -1
+                side_dist_y = (self.player_y / CELL_SIZE - map_y) * delta_dist_y
+            else:
+                step_y = 1
+                side_dist_y = (map_y + 1.0 - self.player_y / CELL_SIZE) * delta_dist_y
+
+            # DDA
+            hit = False
+            side = 0
+            while not hit:
+                # jump to next map square
+                if side_dist_x < side_dist_y:
+                    side_dist_x += delta_dist_x
+                    map_x += step_x
+                    side = 0
+                else:
+                    side_dist_y += delta_dist_y
+                    map_y += step_y
+                    side = 1
+
+                # check if we've hit a wall
+                if self.grid.get((map_y, map_x)) == 1:
+                    hit = True
+
+            # calculate distance projected on camera direction (avoid fish-eye)
+            if side == 0:
+                perp_wall_dist = (side_dist_x - delta_dist_x)
+            else:
+                perp_wall_dist = (side_dist_y - delta_dist_y)
+
+            # convert tile-based distance to world units
+            perp_wall_dist *= CELL_SIZE
+
+            # correct for fish-eye by angle difference
+            perp_wall_dist *= math.cos(self.player_angle - angle)
+
+            # compute wall height
+            if perp_wall_dist > 0:
+                wall_height = min(SCREEN_HEIGHT, int(5000 / (perp_wall_dist + 0.0001)))
+            else:
+                wall_height = SCREEN_HEIGHT
+
+            # determine wall slice position
+            wall_x = ray * (SCREEN_WIDTH / NUM_RAYS)
+            wall_width = SCREEN_WIDTH / NUM_RAYS
+            wall_y = (SCREEN_HEIGHT - wall_height) / 2
+
+            # choose color
+            color = self.wall_colors.get((map_x, map_y), GREY)
+            pygame.draw.rect(self.screen, color, (wall_x, wall_y, wall_width+1, wall_height))
         
         if mode == 'human':
             pygame.display.flip()
