@@ -47,6 +47,7 @@ class MazeEnv(gym.Env):
                 random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
             ) if r < 0.2 else GREY
         
+        self.starting_coords = (60, 60)
         self.player_x = 60
         self.player_y = 60
         self.player_angle = 0
@@ -92,10 +93,16 @@ class MazeEnv(gym.Env):
 
     def load_map(self, grid_map):
         loaded_map = []
-        cell_map = {'#': 1, ' ': 0}
+        cell_map = {'#': 1, ' ': 0, 'S': 0}
 
-        for row in grid_map:
-            loaded_map.append([cell_map[cell] for cell in row])
+        for i, row in enumerate(grid_map):
+            row_cells = []
+            for j, cell in enumerate(row):
+                if cell == 'S':
+                    self.starting_coords = (j*CELL_SIZE+(CELL_SIZE//2), i*CELL_SIZE+(CELL_SIZE//2))
+                row_cells.append(cell_map[cell])
+            
+            loaded_map.append(row_cells)
 
         self.grid.grid = loaded_map
         self.maze_height = self.grid.h
@@ -143,7 +150,7 @@ class MazeEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-        self.player_x, self.player_y = 60, 60
+        self.player_x, self.player_y = self.starting_coords
         self.player_angle = 0
         self.visited_cells = set()
         self.steps_since_last_reward = 0
