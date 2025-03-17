@@ -88,6 +88,18 @@ class MazeEnv(gym.Env):
         if self.grid.get((int(new_y / CELL_SIZE), int(new_x / CELL_SIZE))) == 0:
             self.player_x = new_x
             self.player_y = new_y
+
+
+    def load_map(self, grid_map):
+        loaded_map = []
+        cell_map = {'#': 1, ' ': 0}
+
+        for row in grid_map:
+            loaded_map.append([cell_map[cell] for cell in row])
+
+        self.grid.grid = loaded_map
+        self.maze_height = self.grid.h
+        self.maze_width = self.grid.w
         
 
     def step(self, action):
